@@ -21,6 +21,9 @@ files and classes when code is run, so be careful to not modify anything else.
 
 import collections
 import heapq
+import itertools
+import queue
+import copy
 
 
 def search(maze, searchMethod):
@@ -33,7 +36,6 @@ def search(maze, searchMethod):
    
 
 def bfs(maze):
-    # return path, num_states_explored
     num_states_explored = 0
     start_position = maze.getStart()
     end_position = maze.getObjectives()
@@ -126,10 +128,25 @@ def greedy(maze):
 
 
 def astar(maze):
+    global globalpath
+    global globallen
+    global not_found
     # initialization
     num_states_explored = 0
     start_position = maze.getStart()
     end_position = maze.getObjectives()
+
+    if (len(end_position) > 1):
+
+        globalpath = []
+        globallen = 0
+        not_found =True
+        visited = []
+        num_states_explored = 0
+        path = []
+        astarMultiple(maze, start_position, end_position, visited, num_states_explored, path)
+
+        return globalpath, globallen
 
     # book keeping, which node is visited and what is in the priority queue
     visited, queue = [], [(distance(start_position, end_position[0]), start_position, 0)]
@@ -167,7 +184,94 @@ def astar(maze):
     parent_list.reverse()
     return parent_list, num_states_explored
 
+def astarMultiple(maze, start_position, end_position, visited, num_states_explored, oldpath):
+
+    # book keeping, which node is visited and what is in the priority queue
+    queue = [(0, start_position, [start_position])]
+    global not_found
+    while queue:
+
+        node = heapq.heappop(queue)
+        path = node[2]
+        (row, col) = (node[1][0], node[1][1])
+
+        if node[1] not in visited:
+            visited.append(node[1])
+            if (row, col) in end_position:
+                if len(end_position) == 1:
+                    global globalpath
+                    global globallen
+
+                    if len(oldpath + path) < len(globalpath) or globalpath == []:
+                        globalpath = oldpath + path
+                        globallen = len(visited) + num_states_explored
+                        # print("newlength!!!")
+                        # print(len(globalpath))
+                        not_found = False
+                        return
+
+                else:
+                    new_visited = []
+                    new_start_position = node[1]
+                    new_end_position = copy.copy(end_position)
+                    new_end_position.remove((row, col))
+
+                    astarMultiple(maze, new_start_position, new_end_position, new_visited, len(visited) + num_states_explored,
+                                      oldpath + path)
+            if not not_found:
+                return
+
+            neighbors = maze.getNeighbors(row, col)
+            for i, neighbor in enumerate(neighbors):
+                position_queue = [x[1] for x in queue]
+                if neighbor not in position_queue:
+                    heapq.heappush(queue, (distance_sum(neighbor, end_position)+len(path)+1, neighbor, path + [neighbor]))
+                else:
+                    index = position_queue.index(neighbor)
+                    if (distance_sum(neighbor, end_position)+len(path)+1) < queue[index][0]:
+                        heapq.heappush(queue, (
+                            distance_sum(neighbor, end_position) + len(path) + 1, neighbor, path + [neighbor]))
+
+    return
+
 
 def distance(start_pos, end_pos):
     dis = abs(end_pos[0] - start_pos[0]) + abs(end_pos[1] - start_pos[1])
     return dis
+def distance_sum(current, end_pos):
+    end_list = copy.copy(end_pos)
+    min = -1
+    minindex = 0
+    total_dis=0
+    while end_list:
+        for i, item in enumerate(end_list):
+            currentdis = distance(current, item)
+            if currentdis < min or min == -1:
+                minindex=i
+                min = currentdis
+        total_dis +=min
+        min =-1
+        current = end_list[minindex]
+        del end_list[minindex]
+
+    return  total_dis
+
+
+def distance_max(current, end_pos):
+
+    max = -1
+    maxindex=0
+    min = -1
+    minindex = 0
+    for i, item in enumerate(end_pos):
+        currentdis = distance(current, item)
+        if currentdis > max or max == -1:
+            maxindex=i
+            max = currentdis
+        if currentdis < min or max == -1:
+            minindex=i
+            min = currentdis
+
+
+    return  min+distance(end_pos[minindex],end_pos[maxindex])
+
