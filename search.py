@@ -128,28 +128,71 @@ def greedy(maze):
 
 
 def astar(maze):
-    global globalpath
-    global globallen
-    global not_found
+
+
     # initialization
     num_states_explored = 0
     start_position = maze.getStart()
     end_position = maze.getObjectives()
 
     if (len(end_position) > 1):
+        return astarMultiple(maze)
+    elif (len(end_position) == 1):
+        return astarsingle(maze,start_position,end_position[0])
 
-        globalpath = []
-        globallen = 0
-        not_found =True
-        visited = []
-        num_states_explored = 0
-        path = []
-        astarMultiple(maze, start_position, end_position, visited, num_states_explored, path)
 
-        return globalpath, globallen
+
+
+
+def astarMultiple(maze):
+
+    # initialization
+    num_states_explored = 0
+    start_position = maze.getStart()
+    end_position = maze.getObjectives()
+
+    mst_dis = findMST(maze,end_position)
 
     # book keeping, which node is visited and what is in the priority queue
-    visited, queue = [], [(distance(start_position, end_position[0]), start_position, 0)]
+    visited = []
+    queue = [[mst_dis+distance_min(start_position, end_position), start_position, [start_position]]]
+    seen = [] # mainly record purposes
+
+    while queue:
+        node = heapq.heappop(queue)
+        path = node[2]
+        (row, col) = (node[1][0], node[1][1])
+
+        if node[1] not in seen:
+            seen.append(node[1])
+
+        if node[1] not in visited:
+            visited.append(node[1])
+            if (row, col) in end_position:
+                if len(end_position) == 1:
+                    return path+[node[1]], len(seen)
+                else:
+                    end_position.remove((row, col))
+                    mst_dis = findMST(maze, end_position)
+                    visited =[]
+                    queue = [[mst_dis + distance_min(node[1], end_position), node[1], path]]
+
+            neighbors = maze.getNeighbors(row, col)
+            for i, neighbor in enumerate(neighbors):
+                position_queue = [x[1] for x in queue]
+                if neighbor not in position_queue:
+                    heapq.heappush(queue,[mst_dis + distance_min(neighbor, end_position)+ len(path) + 1, neighbor, path + [neighbor]])
+                else:
+                    index = position_queue.index(neighbor)
+                    if (mst_dis + distance_min(neighbor, end_position)) + len(path) + 1 < queue[index][0]:
+                        heapq.heappush(queue, [mst_dis + distance_min(neighbor, end_position) + len(path) + 1, neighbor, path + [neighbor]])
+
+    return
+
+def astarsingle(maze, start_position, end_position):
+    num_states_explored =0
+    # book keeping, which node is visited and what is in the priority queue
+    visited, queue = [], [(distance(start_position, end_position), start_position, 0)]
     parent_map = {start_position: start_position}
     not_found = True
     while queue and not_found:
@@ -157,7 +200,7 @@ def astar(maze):
         node = heapq.heappop(queue)
         vertex = node[1]
         visited.append(vertex)
-        if (vertex[0], vertex[1]) == end_position[0]:
+        if (vertex[0], vertex[1]) == end_position:
             not_found = False
             break
         for neighbour in maze.getNeighbors(vertex[0], vertex[1]):
@@ -165,18 +208,18 @@ def astar(maze):
             if neighbour not in visited:
                 position_queue = [x[1] for x in queue]
                 if neighbour not in position_queue:
-                    heapq.heappush(queue, (distance(neighbour, end_position[0])+node[2]+1, neighbour, node[2]+1))
+                    heapq.heappush(queue, (distance(neighbour, end_position)+node[2]+1, neighbour, node[2]+1))
                     parent_map[neighbour] = (vertex[0], vertex[1])
                 else:
                     index = position_queue.index(neighbour)
-                    if (distance(neighbour, end_position[0])+node[2]+1) < queue[index][0]:
+                    if (distance(neighbour, end_position)+node[2]+1) < queue[index][0]:
                         heapq.heappush(queue,
-                                       (distance(neighbour, end_position[0]) + node[2] + 1, neighbour, node[2] + 1))
+                                       (distance(neighbour, end_position) + node[2] + 1, neighbour, node[2] + 1))
                         parent_map[neighbour] = (vertex[0], vertex[1])
 
     # backtrack to find the trace
     parent_list = list()
-    current = end_position[0]
+    current = end_position
     while current != start_position:
         parent_list.append(current)
         current = parent_map[current]
@@ -184,80 +227,11 @@ def astar(maze):
     parent_list.reverse()
     return parent_list, num_states_explored
 
-def astarMultiple(maze, start_position, end_position, visited, num_states_explored, oldpath):
-
-    # book keeping, which node is visited and what is in the priority queue
-    queue = [(0, start_position, [start_position])]
-    global not_found
-    while queue:
-
-        node = heapq.heappop(queue)
-        path = node[2]
-        (row, col) = (node[1][0], node[1][1])
-
-        if node[1] not in visited:
-            visited.append(node[1])
-            if (row, col) in end_position:
-                if len(end_position) == 1:
-                    global globalpath
-                    global globallen
-
-                    if len(oldpath + path) < len(globalpath) or globalpath == []:
-                        globalpath = oldpath + path
-                        globallen = len(visited) + num_states_explored
-                        # print("newlength!!!")
-                        # print(len(globalpath))
-                        not_found = False
-                        return
-
-                else:
-                    new_visited = []
-                    new_start_position = node[1]
-                    new_end_position = copy.copy(end_position)
-                    new_end_position.remove((row, col))
-
-                    astarMultiple(maze, new_start_position, new_end_position, new_visited, len(visited) + num_states_explored,
-                                      oldpath + path)
-            if not not_found:
-                return
-
-            neighbors = maze.getNeighbors(row, col)
-            for i, neighbor in enumerate(neighbors):
-                position_queue = [x[1] for x in queue]
-                if neighbor not in position_queue:
-                    heapq.heappush(queue, (distance_sum(neighbor, end_position)+len(path)+1, neighbor, path + [neighbor]))
-                else:
-                    index = position_queue.index(neighbor)
-                    if (distance_sum(neighbor, end_position)+len(path)+1) < queue[index][0]:
-                        heapq.heappush(queue, (
-                            distance_sum(neighbor, end_position) + len(path) + 1, neighbor, path + [neighbor]))
-
-    return
-
-
 def distance(start_pos, end_pos):
     dis = abs(end_pos[0] - start_pos[0]) + abs(end_pos[1] - start_pos[1])
     return dis
-def distance_sum(current, end_pos):
-    end_list = copy.copy(end_pos)
-    min = -1
-    minindex = 0
-    total_dis=0
-    while end_list:
-        for i, item in enumerate(end_list):
-            currentdis = distance(current, item)
-            if currentdis < min or min == -1:
-                minindex=i
-                min = currentdis
-        total_dis +=min
-        min =-1
-        current = end_list[minindex]
-        del end_list[minindex]
 
-    return  total_dis
-
-
-def distance_max(current, end_pos):
+def distance_min(current, end_pos):
 
     max = -1
     maxindex=0
@@ -268,10 +242,112 @@ def distance_max(current, end_pos):
         if currentdis > max or max == -1:
             maxindex=i
             max = currentdis
-        if currentdis < min or max == -1:
+        if currentdis < min or min == -1:
             minindex=i
             min = currentdis
 
 
-    return  min+distance(end_pos[minindex],end_pos[maxindex])
+    return  min
 
+def findMST(maze,end_position):
+    end_list = list(itertools.combinations(range(len(end_position)), 2))
+    for i, pairs in enumerate(end_list):
+        (parent_list, num_states_explored) = astarsingle(maze, end_position[pairs[0]], end_position[pairs[1]])
+        end_list[i] = [pairs[0], pairs[1], len(parent_list)]
+
+    g = Graph(len(end_position))
+    for i, pairs in enumerate(end_list):
+        g.addEdge(pairs[0], pairs[1], pairs[2])
+
+    sum =0
+    result = g.KruskalMST()
+    for i in result:
+        sum =sum + i[2]
+    return sum
+
+# This class is adopted from internet, https://www.geeksforgeeks.org/kruskals-minimum-spanning-tree-algorithm-greedy-algo-2/
+# Python program for Kruskal's algorithm to find
+# Minimum Spanning Tree of a given connected,
+# undirected and weighted graph
+
+# Class to represent a graph
+class Graph:
+
+    def __init__(self, vertices):
+        self.V = vertices  # No. of vertices
+        self.graph = []  # default dictionary
+        # to store graph
+
+    # function to add an edge to graph
+    def addEdge(self, u, v, w):
+        self.graph.append([u, v, w])
+
+    # A utility function to find set of an element i
+    # (uses path compression technique)
+    def find(self, parent, i):
+        if parent[i] == i:
+            return i
+        return self.find(parent, parent[i])
+
+    # A function that does union of two sets of x and y
+    # (uses union by rank)
+    def union(self, parent, rank, x, y):
+        xroot = self.find(parent, x)
+        yroot = self.find(parent, y)
+
+        # Attach smaller rank tree under root of
+        # high rank tree (Union by Rank)
+        if rank[xroot] < rank[yroot]:
+            parent[xroot] = yroot
+        elif rank[xroot] > rank[yroot]:
+            parent[yroot] = xroot
+
+        # If ranks are same, then make one as root
+        # and increment its rank by one
+        else:
+            parent[yroot] = xroot
+            rank[xroot] += 1
+
+    # The main function to construct MST using Kruskal's
+    # algorithm
+    def KruskalMST(self):
+
+        result = []  # This will store the resultant MST
+
+        i = 0  # An index variable, used for sorted edges
+        e = 0  # An index variable, used for result[]
+
+        # Step 1:  Sort all the edges in non-decreasing
+        # order of their
+        # weight.  If we are not allowed to change the
+        # given graph, we can create a copy of graph
+        self.graph = sorted(self.graph, key=lambda item: item[2])
+
+        parent = []
+        rank = []
+
+        # Create V subsets with single elements
+        for node in range(self.V):
+            parent.append(node)
+            rank.append(0)
+
+        # Number of edges to be taken is equal to V-1
+        while e < self.V - 1:
+
+            # Step 2: Pick the smallest edge and increment
+            # the index for next iteration
+            u, v, w = self.graph[i]
+            i = i + 1
+            x = self.find(parent, u)
+            y = self.find(parent, v)
+
+            # If including this edge does't cause cycle,
+            # include it in result and increment the index
+            # of result for next edge
+            if x != y:
+                e = e + 1
+                result.append([u, v, w])
+                self.union(parent, rank, x, y)
+                # Else discard the edge
+
+        return  result
