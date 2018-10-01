@@ -36,6 +36,7 @@ def search(maze, searchMethod):
    
 
 def bfs(maze):
+    return [], 0
     num_states_explored = 0
     start_position = maze.getStart()
     end_position = maze.getObjectives()
@@ -65,6 +66,7 @@ def bfs(maze):
 
 
 def dfs(maze):
+    return [], 0
     num_states_explored = 0
     start_position = maze.getStart()
     end_position = maze.getObjectives()
@@ -95,6 +97,7 @@ def dfs(maze):
 
 
 def greedy(maze):
+    return [],0
     # initialization
     num_states_explored = 0
     start_position = maze.getStart()
@@ -135,10 +138,40 @@ def astar(maze):
     start_position = maze.getStart()
     end_position = maze.getObjectives()
 
-    if (len(end_position) > 1):
-        return astarMultiple(maze)
-    elif (len(end_position) == 1):
-        return astarsingle(maze,start_position,end_position[0])
+    # if (len(end_position) > 1):
+    #     return astarMultiple(maze)
+    # elif (len(end_position) == 1):
+    #     return astarsingle(maze,start_position,end_position[0])
+    return astarsingle1(maze, start_position, end_position)
+
+def astarsingle1(maze, start_position, end_position):
+
+    visited = []
+    queue = [[0, start_position, [start_position]]]
+
+    while queue:
+        node = heapq.heappop(queue)
+        weight, position, path = node[0] , node[1] , node[2]
+
+        if position not in visited:
+            visited.append(position)
+            if (position[0], position[1]) in end_position:
+                return path, len(visited)
+
+            neighbors = maze.getNeighbors(position[0], position[1])
+            for i, neighbor in enumerate(neighbors):
+                position_queue = [x[1] for x in queue]
+                if neighbor not in position_queue:
+                    heapq.heappush(queue, [min(distance(neighbor, end) for end in end_position)+ len(path) + 1, neighbor,
+                                           path + [neighbor]])
+                else:
+                    index = position_queue.index(neighbor)
+                    if (min(distance(neighbor, end) for end in end_position) + len(path) + 1 )< queue[index][0]:
+                        heapq.heappush(queue,
+                                       [min(distance(neighbor, end) for end in end_position) + len(path) + 1, neighbor,
+                                        path + [neighbor]])
+    print("no path find")
+    return [], 0
 
 
 
